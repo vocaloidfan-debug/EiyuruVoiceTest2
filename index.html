@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"><title>EiyuruVoice</title>
+    <script src="https://cloudflare.com"></script>
+    <style>
+        body { background: #0a0a0f; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
+        header, .footer { background: #12121a; display: flex; align-items: center; padding: 10px; gap: 15px; border-bottom: 1px solid #222; }
+        .logo { font-weight: bold; color: #ff2a74; }
+        .btn { background: #ff2a74; color: #fff; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        .sidebar { position: fixed; top: 0; left: -260px; width: 240px; height: 100%; background: #12121a; z-index: 100; transition: 0.3s; padding: 15px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #333; }
+        .sidebar.active { left: 0; }
+        .space { display: flex; flex: 1; overflow: hidden; }
+        .piano { width: 50px; background: #12121a; display: flex; flex-direction: column; }
+        .key { height: 30px; border-bottom: 1px solid #222; display: flex; align-items: center; justify-content: flex-end; padding-right: 3px; font-size: 9px; cursor: pointer; background: #fff; color: #000; }
+        .key.b { background: #111; color: #fff; }
+        .container { flex: 1; overflow: auto; position: relative; }
+        .grid { position: relative; background-size: 40px 30px; background-image: linear-gradient(to right, #1a1a26 1px, transparent 1px), linear-gradient(to bottom, #1a1a26 1px, transparent 1px); }
+        .note { position: absolute; height: 26px; margin-top: 2px; background: linear-gradient(90deg, #ff2a74, #b01c4e); border: 1px solid #ff7fa7; border-radius: 4px; display: flex; align-items: center; padding: 0 4px; font-size: 10px; }
+        .note input { background: transparent; border: none; color: #fff; width: 30px; text-align: center; outline: none; }
+        .note span { cursor: pointer; margin-left: 3px; color: #ff7fa7; }
+        .footer { border-top: 1px solid #222; border-bottom: none; height: 45px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <button class="btn" onclick="document.getElementById('side').classList.add('active')">☰ Menu</button>
+        <div class="logo">EiyuruVoice</div>
+        <span>BPM:</span><input type="number" id="bpm" value="120" style="width:50px; background:#222; color:#fff; border:1px solid #333;">
+        <select id="lang" style="background:#222; color:#fff; border:1px solid #333;"><option>EN</option><option>TR</option><option>JA</option><option>AR</option></select>
+        <button class="btn" id="pBtn" onclick="play()">▶ Play</button>
+        <button class="btn" style="background:#333;" onclick="clr()">Clear</button>
+    </header>
+
+    <div class="sidebar" id="side">
+        <div style="display:flex; justify-content:space-between;"><b style="color:#ff2a74">Menu</b><button class="btn" onclick="document.getElementById('side').classList.remove('active')">✕</button></div>
+        <div>USTX:<br><input type="file" id="ust" accept=".ust,.ustx" onchange="alert('UST Loaded')"></div>
+        <div>Inst:<br><input type="file" id="inst" accept="audio/*" onchange="ldInst()"></div>
+        <div>Vb Zip:<br><input type="file" id="vb" accept=".zip" onchange="ldVb()"></div>
+        <div>Phonemizer:<br><input type="text" id="ph" style="width:100%; background:#222; color:#fff; border:1px solid #333; margin-top:3px;"><button class="btn" style="width:100%; margin-top:3px;" onclick="cvPh()">Convert</button></div>
+    </div>
+
+    <div class="space">
+        <div class="piano" id="pno"></div>
+        <div class="container"><div class="grid" id="g" onclick="add(event)"></div></div>
+    </div>
+
+    <div class="footer">
+        <div>Pitch: <input type="range" id="pit" min="-100" max="100" value="0" style="accent-color:#ff2a74;"></div>
+        <div>Vibrato: <input type="range" id="vib" min="0" max="100" value="30" style="accent-color:#ff2a74;"></div>
+    </div>
+
+    <script>
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        let vb = {}, instB = null, instS = null, notes = [], playing = false;
+        const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'], scale = [];
+
+        for (let o = 5; o >= 3; o--) {
+            for (let i = 11; i >= 0; i--) {
+                const name = names[i] + o;
+                scale.push({ name, f: 440 * Math.pow(2, ((o - 4) * 12 + i - 9) / 12), b: name.includes('#') });
+            }
+        }
+
+        const g = document.getElementById('g'); g.style.height = (scale.length * 30) + 'px'; g.style.width = '2000px';
+
+        scale.forEach((n) => {
+            const el = document.createElement('div'); el.className = `key ${n.b ? 'b' : ''}`; el.innerHTML = `<span>${n.name}</span>`;
+            el.onclick = () => syn(n.f, "a", 0.4); document.getElementById('pno').appendChild(el);
+        });
+
+        const map = { 'a':'あ','i':'い','u':'う','e':'え','o':'お','ka':'か','ki':'き','ku':'く','ke':'け','ko':'こ','sa':'さ','shi':'し','su':'す','se':'せ','so':'そ','ta':'た','chi':'ち','tsu':'つ','te':'て','to':'と','na':'な','ni':'に','nu':'ぬ','ne':'ね','no':'ของ','ha':'は','hi':'ひ','fu':'ふ','he':'へ','ho':'ほ','ma':'ま','mi':'み','mu':'む','me':'め','mo':'も','ra':'ら','ri':'り','ru':'る','re':'れ','ro':'ろ','wa':'わ','n':'ん' };
+        const rev = Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k]));
+        function tr(t) { return map[t.toLowerCase()] || rev[t] || t; }
+
+        function add(e) {
+            if (e.target !== g) return;
+            const r = g.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / 40) * 40, y = Math.floor((e.clientY - r.top) / 30) * 30, i = y / 30;
+            if (i >= 0 && i < scale.length) {
+                const id = 'n_' + Date.now(), el = document.createElement('div');
+                el.className = 'note'; el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = '80px';
+                const inp = document.createElement('input'); inp.value = 'a'; inp.onchange = (e) => e.target.value = tr(e.target.value);
+                const del = document.createElement('span'); del.innerHTML = '✕'; del.onclick = (ev) => { ev.stopPropagation(); el.remove(); notes = notes.filter(n => n.id !== id); };
+                el.appendChild(inp); el.appendChild(del); g.appendChild(el);
+                notes.push({ id, inp, f: scale[i].f, x, w: 80 }); syn(scale[i].f, "a", 0.3);
+            }
+        }
+
+        function syn(f, lyr, d) {
+            const o = ctx.createOscillator(), gain = ctx.createGain(); o.type = 'sawtooth';
+            o.frequency.setValueAtTime(f * Math.pow(2, parseFloat(document.getElementById('pit').value) / 1200), ctx.currentTime);
+            const v = parseFloat(document.getElementById('vib').value);
+            if (v > 0) {
+                const vO = ctx.createOscillator(), vG = ctx.createGain(); vO.frequency.value = 6; vG.gain.value = v * 0.1;
+                vO.connect(vG); vG.connect(o.frequency); vO.start(); vO.stop(ctx.currentTime + d);
+            }
+            const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = (lyr === 'e' || lyr === 'え') ? 500 : 700; fl.Q.value = 5;
+            o.connect(fl); fl.connect(gain); gain.connect(ctx.destination);
+            gain.gain.setValueAtTime(0, ctx.currentTime); gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05); gain.gain.linearRampToValueAtTime(0, ctx.currentTime + d);
+            o.start(); o.stop(ctx.currentTime + d);
+        }
+
+        function play() {
+            if (playing) { playing = false; document.getElementById('pBtn').innerText = "▶ Play"; if(instS) try{instS.stop()}catch(e){} return; }
+            playing = true; document.getElementById('pBtn').innerText = "■ Stop";
+            const bD = 60 / parseInt(document.getElementById('bpm').value);
+            if (instB) { instS = ctx.createBufferSource(); instS.buffer = instB; instS.connect(ctx.destination); instS.start(0); }
+            notes.forEach(n => {
+                const s = (n.x / 40) * (bD / 2), d = (n.w / 40) * (bD / 2);
+                setTimeout(() => {
+                    if (!playing) return; const l = n.inp.value.trim().toLowerCase();
+                    if(vb[l]) {
+                        const src = ctx.createBufferSource(); src.buffer = vb[l]; src.playbackRate.value = n.f / 261.63; src.connect(ctx.destination); src.start(0); src.stop(ctx.currentTime + d);
+                    } else { syn(n.f, l, d); }
+                }, s * 1000);
+            });
+        }
+
+        function ldInst() { const f = document.getElementById('inst').files[0], r = new FileReader(); r.onload = (e) => ctx.decodeAudioData(e.target.result, b => instB = b); r.readAsArrayBuffer(f); }
+        function ldVb() {
+            JSZip.loadAsync(document.getElementById('vb').files[0]).then(zip => {
+                zip.forEach((p, entry) => { if (entry.name.endsWith('.wav')) { const l = entry.name.split('/').pop().replace('.wav', '').toLowerCase(); entry.async("arraybuffer").then(d => ctx.decodeAudioData(d, b => vb[l] = b)); } });
+            });
+        }
+        function cvPh() { const i = document.getElementById('ph'); i.value = tr(i.value); }
+        function clr() { document.getElementById('g').innerHTML = ''; notes = []; }
+    </script>
+</body>
+</html>

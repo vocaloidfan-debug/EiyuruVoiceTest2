@@ -1,0 +1,19 @@
+body { background: #0a0a0f; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
+header, .footer { background: #12121a; display: flex; align-items: center; padding: 10px; gap: 15px; border-bottom: 1px solid #222; }
+header input, select { background: #222; color: #fff; border: 1px solid #333; width: 50px; }
+.logo { font-weight: bold; color: #ff2a74; }
+.btn { background: #ff2a74; color: #fff; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; border-radius: 4px; }
+.sidebar { position: fixed; top: 0; left: -260px; width: 240px; height: 100%; background: #12121a; z-index: 100; transition: 0.3s; padding: 15px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #333; }
+.sidebar.active { left: 0; }
+.sidebar input[type="text"] { width: 100%; background: #222; color: #fff; border: 1px solid #333; margin-top: 3px; }
+.space { display: flex; flex: 1; overflow: hidden; }
+.piano { width: 50px; background: #12121a; display: flex; flex-direction: column; }
+.key { height: 30px; border-bottom: 1px solid #222; display: flex; align-items: center; justify-content: flex-end; padding-right: 3px; font-size: 9px; cursor: pointer; background: #fff; color: #000; }
+.key.b { background: #111; color: #fff; }
+.container { flex: 1; overflow: auto; position: relative; }
+.grid { position: relative; background-size: 40px 30px; background-image: linear-gradient(to right, #1a1a26 1px, transparent 1px), linear-gradient(to bottom, #1a1a26 1px, transparent 1px); }
+.note { position: absolute; height: 26px; margin-top: 2px; background: linear-gradient(90deg, #ff2a74, #b01c4e); border: 1px solid #ff7fa7; border-radius: 4px; display: flex; align-items: center; padding: 0 4px; font-size: 10px; }
+.note input { background: transparent; border: none; color: #fff; width: 30px; text-align: center; outline: none; }
+.note span { cursor: pointer; margin-left: 3px; color: #ff7fa7; }
+.footer { border-top: 1px solid #222; border-bottom: none; height: 45px; }
+.footer input { accent-color: #ff2a74; }
